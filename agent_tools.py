@@ -52,3 +52,24 @@ def calculate_ratio(company_name: str, ratio_name: str) -> float:
     db.close()
     return result
 
+@tool
+def get_risks(company_name: str) -> str:
+    """Get all risk factors for a company."""
+    db = SessionLocal()
+    company = db.query(Company).filter(Company.name == company_name).first()
+    if not company:
+        db.close()
+        return "Company not found"
+    risks = db.query(Risk).filter(Risk.company_id == company.id).all()
+    db.close()
+    if not risks:
+        return "No risks found"
+    return "\n".join([f"- [{r.severity}] {r.category}: {r.description}" for r in risks])
+
+@tool
+def retrieve_context(company_name: str, query: str) -> str:
+    """Retrieve relevant text chunks from the company's annual report."""
+    chunks = retrieve_chunks(query, company_name, k=3)
+    return "\n\n".join(chunks) if chunks else "No relevant information found."
+
+# (Optional) A comparison tool can be added later.

@@ -15,3 +15,40 @@ def get_kpi(company_name: str, kpi_name: str) -> float:
     db.close()
     return kpi.value if kpi else None
 
+@tool
+def calculate_ratio(company_name: str, ratio_name: str) -> float:
+    """Calculate a financial ratio: 'current_ratio', 'debt_to_equity', 'roe', 'gross_margin', 'net_margin'."""
+    db = SessionLocal()
+    company = db.query(Company).filter(Company.name == company_name).first()
+    if not company:
+        db.close()
+        return None
+
+    def get_val(name):
+        k = db.query(KPI).filter(and_(KPI.company_id == company.id, KPI.kpi_name == name)).first()
+        return k.value if k else None
+
+    ca = get_val("current_assets") or get_val("total_current_assets")
+    cl = get_val("current_liabilities") or get_val("total_current_liabilities")
+    ta = get_val("total_assets")
+    tl = get_val("total_liabilities")
+    te = get_val("total_equity")
+    rev = get_val("revenue")
+    ni = get_val("net_income")
+    gp = get_val("gross_profit")
+    oi = get_val("operating_income")
+
+    result = None
+    if ratio_name == "current_ratio" and ca and cl:
+        result = ca / cl
+    elif ratio_name == "debt_to_equity" and tl and te:
+        result = tl / te
+    elif ratio_name == "roe" and ni and te:
+        result = ni / te
+    elif ratio_name == "gross_margin" and gp and rev:
+        result = gp / rev
+    elif ratio_name == "net_margin" and ni and rev:
+        result = ni / rev
+    db.close()
+    return result
+

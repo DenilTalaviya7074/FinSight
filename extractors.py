@@ -33,3 +33,31 @@ def extract_kpis(text: str, company: str) -> List[dict]:
     except Exception as e:
         print(f"KPI extraction error: {e}")
         return []
+    
+    
+# --- Risk extraction ---
+class RiskItem(BaseModel):
+    category: str = Field(description="e.g., Market, Financial")
+    severity: str = Field(description="High/Medium/Low")
+    description: str = Field(description="brief description")
+
+class RiskList(BaseModel):
+    risks: List[RiskItem]
+    
+risk_parser = PydanticOutputParser(pydantic_object=RiskList)
+
+risk_prompt = ChatPromptTemplate.from_messages([
+    ("system", "Extract business risks from the report. Classify each as High/Medium/Low. Return JSON list."),
+    ("human", "Text:\n{text}")
+])
+
+
+risk_chain = risk_prompt | llm | risk_parser
+
+def extract_risks(text: str, company: str) -> List[dict]:
+    try:
+        result = risk_chain.invoke({"text": text[:4000]})
+        return [r.dict() for r in result.risks]
+    except Exception as e:
+        print(f"Risk extraction error: {e}")
+        return []

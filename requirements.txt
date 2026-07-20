@@ -4,9 +4,9 @@ langchain-experimental
 langchain-chroma
 langsmith
 streamlit
-langchain>=0.3.14
-langchain-ollama>=0.2.1
-langchain-community>=0.3.13
+langchain==0.3.27
+langchain-ollama
+langchain-community
 chromadb
 sentence-transformers
 PyMuPDF

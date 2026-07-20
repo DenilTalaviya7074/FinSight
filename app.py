@@ -1,13 +1,7 @@
 import streamlit as st
 from langchain_ollama import ChatOllama
-# LangChain 0.3+ imports
-try:
-    from langchain.agents import AgentExecutor, create_react_agent
-except ImportError:
-    # Fallback for older versions (<0.3)
-    from langchain.agents.agent import AgentExecutor
-    from langchain.agents.react import create_react_agent
-from langchain_classic.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferMemory
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from agent_tools import get_kpi, calculate_ratio, get_risks, retrieve_context
 from db_models import SessionLocal, Company, KPI, Ratio, Risk

@@ -2,7 +2,7 @@ import streamlit as st
 from langchain_ollama import ChatOllama
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import AgentExecutor, create_react_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import PromptTemplate
 from agent_tools import get_kpi, calculate_ratio, get_risks, retrieve_context
 from db_models import SessionLocal, Company, KPI, Ratio, Risk
 from rag_utils import ingest_document
@@ -13,6 +13,8 @@ import tempfile
 import plotly.express as px
 import pandas as pd
 
+# ... (rest of your imports)
+
 # Set page config
 st.set_page_config(page_title="FinSight AI", layout="wide")
 st.title("📊 FinSight AI — Conversational Financial Analyst")
@@ -22,18 +24,56 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "companies" not in st.session_state:
     st.session_state.companies = []
+
+# --- Define the ReAct system prompt ---
+# NOTE: create_react_agent requires exactly these input variables in the
+# template: {tools}, {tool_names}, {input}, and {agent_scratchpad}.
+# The template must also include the "Thought/Action/Action Input/Observation"
+# scaffolding so the ReAct output parser can parse the LLM's responses.
+REACT_AGENT_SYSTEM_PROMPT = """Assistant is a financial analyst assistant that can use tools to answer questions about companies using data that has been uploaded to a database.
+
+TOOLS:
+------
+Assistant has access to the following tools:
+
+{tools}
+
+To use a tool, please use the following format:
+
+```
+Thought: Do I need to use a tool? Yes
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+```
+
+When you have a response to say to the Human, or if you do not need to use a tool, you MUST use the format:
+
+```
+Thought: Do I need to use a tool? No
+Final Answer: [your response here]
+```
+
+Begin!
+
+Previous conversation history:
+{chat_history}
+
+New input: {input}
+{agent_scratchpad}"""
+
+# --- Create agent executor ---
 if "agent_executor" not in st.session_state:
-    # We'll create the agent once and reuse it
-    llm = ChatOllama(model="llama3.2:3b", temperature=0)
+    llm = ChatOllama(model="llama3.2:latest", temperature=0)
     tools = [get_kpi, calculate_ratio, get_risks, retrieve_context]
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a financial analyst assistant. Use the provided tools to answer questions about companies.
-        If you don't know, say so. Be concise."""),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    # ReAct agents use a plain PromptTemplate (single text blob), not a
+    # ChatPromptTemplate with separate message roles, because the parser
+    # expects the full Thought/Action/Observation transcript to flow as
+    # one continuous string.
+    prompt = PromptTemplate.from_template(REACT_AGENT_SYSTEM_PROMPT)
+
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=False)
     agent = create_react_agent(llm, tools, prompt)
     st.session_state.agent_executor = AgentExecutor(
         agent=agent,
@@ -43,6 +83,8 @@ if "agent_executor" not in st.session_state:
         handle_parsing_errors=True,
         max_iterations=5
     )
+
+# ... (rest of your sidebar and chat code)
 
 # Sidebar: Upload and company list
 with st.sidebar:

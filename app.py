@@ -1,8 +1,8 @@
 import streamlit as st
 from langchain_ollama import ChatOllama
 from langchain.agents import AgentExecutor, create_react_agent
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_classic.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from agent_tools import get_kpi, calculate_ratio, get_risks, retrieve_context
 from db_models import SessionLocal, Company, KPI, Ratio, Risk
 from rag_utils import ingest_document

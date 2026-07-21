@@ -26,10 +26,14 @@ if "companies" not in st.session_state:
     st.session_state.companies = []
 
 # --- Define the ReAct system prompt ---
-# NOTE: create_react_agent requires exactly these input variables in the
-# template: {tools}, {tool_names}, {input}, and {agent_scratchpad}.
-# The template must also include the "Thought/Action/Action Input/Observation"
-# scaffolding so the ReAct output parser can parse the LLM's responses.
+# NOTE ON WHY WE'RE BACK TO create_react_agent:
+# create_structured_chat_agent (JSON action_input) hit a ChatOllama bug where
+# the model's dict-shaped output gets attached directly as AIMessage.content
+# (which must be a str), causing a Pydantic validation error. Rather than
+# fight that framework/version incompatibility, we use plain ReAct, where
+# Action Input is always a single string. The multi-argument tools
+# (get_kpi, calculate_ratio, retrieve_context) now parse a comma-separated
+# string themselves — see the updated agent_tools.py.
 REACT_AGENT_SYSTEM_PROMPT = """Assistant is a financial analyst assistant that can use tools to answer questions about companies using data that has been uploaded to a database.
 
 TOOLS:
@@ -46,6 +50,11 @@ Action: the action to take, should be one of [{tool_names}]
 Action Input: the input to the action
 Observation: the result of the action
 ```
+
+Some tools require MULTIPLE pieces of information. For those tools, the
+Action Input must be a single line formatted as: company_name, field_name
+For example: Action Input: Apple, total_revenue
+Do NOT use JSON, quotes, or key=value pairs. Just plain comma-separated text.
 
 When you have a response to say to the Human, or if you do not need to use a tool, you MUST use the format:
 

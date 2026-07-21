@@ -3,9 +3,30 @@ from db_models import SessionLocal, Company, KPI, Ratio, Risk
 from sqlalchemy import and_
 from rag_utils import retrieve_chunks
 
+# NOTE: create_react_agent (plain ReAct) only supports a SINGLE STRING as
+# "Action Input" — it cannot map multiple named parameters. Rather than
+# fighting LangChain's structured-chat / ChatOllama compatibility issues,
+# these tools now accept one string and parse it themselves. Expected
+# format: "company_name, field_name" (comma-separated). This is much
+# easier for a small local model (e.g. llama3.2:3b) to produce reliably
+# than nested JSON.
+
+def _parse_two_args(tool_input: str):
+    """Split 'Apple, total_revenue' -> ('Apple', 'total_revenue')."""
+    if "," not in tool_input:
+        raise ValueError(
+            f"Expected input as 'company_name, field_name' but got: {tool_input!r}"
+        )
+    company_name, field_name = tool_input.split(",", 1)
+    return company_name.strip().strip('"').strip("'"), field_name.strip().strip('"').strip("'")
+
+
 @tool
-def get_kpi(company_name: str, kpi_name: str) -> float:
-    """Retrieve a KPI value for a company."""
+def get_kpi(tool_input: str) -> float:
+    """Retrieve a KPI value for a company.
+    Input MUST be a single string formatted as: "company_name, kpi_name"
+    Example: "Apple, total_revenue" """
+    company_name, kpi_name = _parse_two_args(tool_input)
     db = SessionLocal()
     company = db.query(Company).filter(Company.name == company_name).first()
     if not company:
@@ -15,9 +36,14 @@ def get_kpi(company_name: str, kpi_name: str) -> float:
     db.close()
     return kpi.value if kpi else None
 
+
 @tool
-def calculate_ratio(company_name: str, ratio_name: str) -> float:
-    """Calculate a financial ratio: 'current_ratio', 'debt_to_equity', 'roe', 'gross_margin', 'net_margin'."""
+def calculate_ratio(tool_input: str) -> float:
+    """Calculate a financial ratio for a company.
+    Input MUST be a single string formatted as: "company_name, ratio_name"
+    Valid ratio_name values: 'current_ratio', 'debt_to_equity', 'roe', 'gross_margin', 'net_margin'
+    Example: "Apple, current_ratio" """
+    company_name, ratio_name = _parse_two_args(tool_input)
     db = SessionLocal()
     company = db.query(Company).filter(Company.name == company_name).first()
     if not company:
@@ -52,9 +78,10 @@ def calculate_ratio(company_name: str, ratio_name: str) -> float:
     db.close()
     return result
 
+
 @tool
 def get_risks(company_name: str) -> str:
-    """Get all risk factors for a company."""
+    """Get all risk factors for a company. Input is just the company name."""
     db = SessionLocal()
     company = db.query(Company).filter(Company.name == company_name).first()
     if not company:
@@ -66,9 +93,13 @@ def get_risks(company_name: str) -> str:
         return "No risks found"
     return "\n".join([f"- [{r.severity}] {r.category}: {r.description}" for r in risks])
 
+
 @tool
-def retrieve_context(company_name: str, query: str) -> str:
-    """Retrieve relevant text chunks from the company's annual report."""
+def retrieve_context(tool_input: str) -> str:
+    """Retrieve relevant text chunks from a company's annual report.
+    Input MUST be a single string formatted as: "company_name, query"
+    Example: "Apple, supply chain risk" """
+    company_name, query = _parse_two_args(tool_input)
     chunks = retrieve_chunks(query, company_name, k=3)
     return "\n\n".join(chunks) if chunks else "No relevant information found."
 
